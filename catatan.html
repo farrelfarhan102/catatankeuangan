@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dompet kita — Catatan Keuangan Harian</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-deep:    #0A0E1A;
+      --bg-card:    #111827;
+      --bg-glass:   rgba(17,24,39,0.7);
+      --teal:       #00D4AA;
+      --teal-dim:   #00a884;
+      --gold:       #FFB347;
+      --rose:       #FF6B8A;
+      --blue:       #4F9EFF;
+      --text-hi:    #F0F4FF;
+      --text-mid:   #9CA8C4;
+      --text-lo:    #4B5568;
+      --border:     rgba(255,255,255,0.07);
+      --radius:     16px;
+      --shadow:     0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background: var(--bg-deep);
+      color: var(--text-hi);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ─── ANIMATED BG ─── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(0,212,170,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 80% 90%, rgba(79,158,255,0.07) 0%, transparent 60%);
+      pointer-events: none; z-index: 0;
+    }
+
+    /* ─── LAYOUT ─── */
+    .shell { display: flex; min-height: 100vh; position: relative; z-index: 1; }
+
+    /* ─── SIDEBAR ─── */
+    .sidebar {
+      width: 240px; flex-shrink: 0;
+      background: var(--bg-glass);
+      backdrop-filter: blur(20px);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 28px 16px;
+      position: sticky; top: 0; height: 100vh;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 36px; padding: 0 8px;
+    }
+    .logo-icon {
+      width: 38px; height: 38px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--teal), var(--blue));
+      display: grid; place-items: center; font-size: 18px;
+    }
+    .logo-text { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+    .logo-text span { color: var(--teal); }
+
+    .nav-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+      color: var(--text-lo); text-transform: uppercase;
+      padding: 0 12px; margin-bottom: 8px; margin-top: 20px;
+    }
+    .nav-btn {
+      display: flex; align-items: center; gap: 12px;
+      padding: 11px 14px; border-radius: 12px;
+      border: none; background: transparent;
+      color: var(--text-mid); font-family: inherit;
+      font-size: 14px; font-weight: 500;
+      cursor: pointer; width: 100%; text-align: left;
+      transition: all .2s;
+    }
+    .nav-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-hi); }
+    .nav-btn.active {
+      background: rgba(0,212,170,0.12);
+      color: var(--teal);
+      box-shadow: inset 2px 0 0 var(--teal);
+    }
+    .nav-btn i { width: 18px; text-align: center; font-size: 15px; }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 14px;
+      background: rgba(0,212,170,0.06);
+      border: 1px solid rgba(0,212,170,0.15);
+      border-radius: 12px;
+    }
+    .sidebar-footer p { font-size: 12px; color: var(--text-mid); line-height: 1.6; }
+    .sidebar-footer strong { color: var(--teal); }
+
+    /* ─── MAIN ─── */
+    .main { flex: 1; padding: 32px 28px; overflow-y: auto; }
+
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 28px;
+    }
+    .page-title { font-size: 22px; font-weight: 700; }
+    .page-title span { color: var(--teal); }
+    .date-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px; color: var(--text-mid);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 7px 14px; border-radius: 8px;
+    }
+
+    /* ─── TABS ─── */
+    .tabs { display: none; }
+
+    /* ─── VIEWS ─── */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ─── SUMMARY CARDS ─── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px; margin-bottom: 28px;
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      position: relative; overflow: hidden;
+      transition: transform .2s, border-color .2s;
+    }
+    .card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.14); }
+    .card::before {
+      content: ''; position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+    }
+    .card.teal::before  { background: linear-gradient(90deg, var(--teal), var(--blue)); }
+    .card.gold::before  { background: linear-gradient(90deg, var(--gold), #ff8c00); }
+    .card.rose::before  { background: linear-gradient(90deg, var(--rose), #c0392b); }
+    .card.blue::before  { background: linear-gradient(90deg, var(--blue), #8b5cf6); }
+
+    .card-label {
+      font-size: 11px; font-weight: 600; letter-spacing: 1.2px;
+      text-transform: uppercase; color: var(--text-mid); margin-bottom: 10px;
+    }
+    .card-amount {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 24px; font-weight: 600;
+      letter-spacing: -0.5px; line-height: 1;
+      margin-bottom: 8px;
+    }
+    .card.teal .card-amount { color: var(--teal); }
+    .card.gold .card-amount { color: var(--gold); }
+    .card.rose .card-amount { color: var(--rose); }
+    .card.blue .card-amount { color: var(--blue); }
+
+    .card-sub { font-size: 12px; color: var(--text-mid); }
+    .card-icon {
+      position: absolute; right: 18px; top: 18px;
+      font-size: 28px; opacity: 0.12;
+    }
+
+    /* ─── FORM CARD ─── */
+    .form-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px; margin-bottom: 24px;
+    }
+    .form-card h3 {
+      font-size: 15px; font-weight: 600;
+      margin-bottom: 18px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .form-card h3 i { color: var(--teal); }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 12px; align-items: end; }
+    .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; align-items: end; }
+
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label { font-size: 12px; font-weight: 500; color: var(--text-mid); }
+    .field input, .field select, .field textarea {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-hi);
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 14px; padding: 10px 14px;
+      outline: none; width: 100%;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px rgba(0,212,170,0.12);
+    }
+    .field select option { background: #1a2235; }
+    .field textarea { resize: vertical; min-height: 70px; }
+
+    /* ─── BUTTONS ─── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px; border-radius: 10px;
+      border: none; font-family: 'Space Grotesk', sans-serif;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: all .2s; white-space: nowrap;
+    }
+    .btn-teal  { background: var(--teal); color: #0A0E1A; }
+    .btn-teal:hover  { background: #00efbe; transform: translateY(-1px); }
+    .btn-gold  { background: var(--gold); color: #0A0E1A; }
+    .btn-gold:hover  { background: #ffc46b; transform: translateY(-1px); }
+    .btn-rose  { background: var(--rose); color: #fff; }
+    .btn-rose:hover  { background: #ff8fab; transform: translateY(-1px); }
+    .btn-blue  { background: var(--blue); color: #fff; }
+    .btn-blue:hover  { background: #72b3ff; transform: translateY(-1px); }
+    .btn-ghost {
+      background: transparent; color: var(--text-mid);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.06); color: var(--text-hi); }
+    .btn-sm { padding: 7px 14px; font-size: 12px; }
+    .btn-danger { background: rgba(255,107,138,0.15); color: var(--rose); border: 1px solid rgba(255,107,138,0.3); }
+    .btn-danger:hover { background: rgba(255,107,138,0.25); }
+
+    /* ─── TABLE ─── */
+    .table-wrap {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .table-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .table-header h3 { font-size: 15px; font-weight: 600; }
+    .filter-row {
+      display: flex; gap: 8px; align-items: center;
+    }
+    .filter-row select, .filter-row input {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text-hi);
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px; padding: 7px 12px; outline: none;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      padding: 11px 18px; text-align: left;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 1px; text-transform: uppercase;
+      color: var(--text-lo);
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,0.025); }
+    tbody td { padding: 13px 18px; font-size: 14px; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 12px; font-weight: 500;
+    }
+    .badge-income  { background: rgba(0,212,170,0.12); color: var(--teal); }
+    .badge-expense { background: rgba(255,107,138,0.12); color: var(--rose); }
+    .badge-saving  { background: rgba(79,158,255,0.12); color: var(--blue); }
+
+    .amount-income  { color: var(--teal); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+    .amount-expense { color: var(--rose); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+    .amount-saving  { color: var(--blue);  font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+
+    .empty-state {
+      text-align: center; padding: 52px 20px; color: var(--text-lo);
+    }
+    .empty-state i { font-size: 36px; margin-bottom: 12px; display: block; }
+    .empty-state p { font-size: 14px; }
+
+    /* ─── SAVING GOALS ─── */
+    .goals-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr);
+      gap: 16px; margin-bottom: 24px;
+    }
+    .goal-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+      position: relative; overflow: hidden;
+      transition: transform .2s;
+    }
+    .goal-card:hover { transform: translateY(-2px); }
+    .goal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+    .goal-name { font-size: 15px; font-weight: 600; margin-bottom: 3px; }
+    .goal-deadline { font-size: 12px; color: var(--text-mid); }
+    .goal-actions { display: flex; gap: 6px; }
+    .goal-amounts {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 10px;
+    }
+    .goal-saved {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 20px; font-weight: 600; color: var(--blue);
+    }
+    .goal-target {
+      font-size: 13px; color: var(--text-mid);
+    }
+    .progress-bar {
+      height: 8px; border-radius: 4px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden; margin-bottom: 8px;
+    }
+    .progress-fill {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, var(--blue), var(--teal));
+      transition: width .6s cubic-bezier(.4,0,.2,1);
+      position: relative;
+    }
+    .progress-fill::after {
+      content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 4px;
+      background: rgba(255,255,255,0.4); border-radius: 2px;
+    }
+    .goal-pct {
+      font-size: 12px; color: var(--text-mid);
+      display: flex; justify-content: space-between;
+    }
+    .goal-pct .pct-val { color: var(--blue); font-weight: 600; }
+    .goal-complete {
+      position: absolute; inset: 0;
+      background: rgba(0,212,170,0.08);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      border-radius: var(--radius);
+    }
+    .goal-complete i { font-size: 32px; color: var(--teal); margin-bottom: 6px; }
+    .goal-complete p { font-size: 14px; font-weight: 600; color: var(--teal); }
+
+    /* ─── CHART AREA ─── */
+    .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+    }
+    .chart-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 16px; color: var(--text-mid); }
+    canvas { width: 100% !important; }
+
+    /* ─── TOAST ─── */
+    #toast-container {
+      position: fixed; bottom: 24px; right: 24px; z-index: 999;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .toast {
+      padding: 12px 18px; border-radius: 10px;
+      font-size: 14px; font-weight: 500;
+      box-shadow: var(--shadow);
+      animation: slideIn .3s ease;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .toast.success { background: rgba(0,212,170,0.15); border: 1px solid rgba(0,212,170,0.3); color: var(--teal); }
+    .toast.error   { background: rgba(255,107,138,0.15); border: 1px solid rgba(255,107,138,0.3); color: var(--rose); }
+    @keyframes slideIn { from { opacity:0; transform: translateX(20px); } to { opacity:1; transform: none; } }
+
+    /* ─── MODAL ─── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 28px; width: 420px; max-width: 90vw;
+      transform: scale(.95); transition: transform .2s;
+    }
+    .modal-overlay.open .modal { transform: scale(1); }
+    .modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .summary-grid { grid-template-columns: 1fr 1fr; }
+      .form-row { grid-template-columns: 1fr 1fr; }
+      .goals-grid { grid-template-columns: 1fr; }
+      .chart-row { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .main { padding: 16px; }
+      .summary-grid { grid-template-columns: 1fr; }
+      .form-row, .form-row-3 { grid-template-columns: 1fr; }
+    }
+
+    /* ─── UTILITY ─── */
+    .mt-4 { margin-top: 16px; }
+    .flex-end { display: flex; justify-content: flex-end; margin-top: 14px; }
+    .section-gap { margin-bottom: 24px; }
+    .text-mid { color: var(--text-mid); font-size: 13px; }
+
+    /* ─── MONTH SELECTOR ─── */
+    .month-bar {
+      display: flex; gap: 8px; align-items: center; margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .month-bar select {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text-hi);
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px; padding: 8px 14px; outline: none; cursor: pointer;
+    }
+
+    .stat-row {
+      display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px;
+    }
+    .stat-box {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px; text-align: center;
+    }
+    .stat-box .val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 18px; font-weight: 600; margin-bottom: 4px;
+    }
+    .stat-box .lbl { font-size: 11px; color: var(--text-mid); text-transform: uppercase; letter-spacing: 0.8px; }
+  </style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div id="toast-container"></div>
+
+<!-- MODAL: Tambah Goal -->
+<div class="modal-overlay" id="goal-modal">
+  <div class="modal">
+    <h3><i class="fa fa-bullseye" style="color:var(--blue);margin-right:8px"></i>Tambah Target Tabungan</h3>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="field"><label>Nama Target</label><input id="gm-name" placeholder="cth: Liburan Bali"></div>
+      <div class="field"><label>Target Dana (Rp)</label><input id="gm-target" type="number" placeholder="5000000"></div>
+      <div class="field"><label>Dana Awal (Rp)</label><input id="gm-init" type="number" placeholder="0" value="0"></div>
+      <div class="field"><label>Deadline</label><input id="gm-deadline" type="date"></div>
+      <div class="field"><label>Ikon</label>
+        <select id="gm-icon">
+          <option value=> Liburan</option>
+          <option value=> Rumah</option>
+          <option value=> Kendaraan</option>
+          <option value=> Gadget</option>
+          <option value=> Pendidikan</option>
+          <option value=> Pernikahan</option>
+          <option value=> Kesehatan</option>
+          <option value=> Lainnya</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeGoalModal()">Batal</button>
+      <button class="btn btn-blue" onclick="saveGoal()"><i class="fa fa-save"></i> Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Setor Tabungan -->
+<div class="modal-overlay" id="deposit-modal">
+  <div class="modal">
+    <h3 id="deposit-title"><i class="fa fa-piggy-bank" style="color:var(--teal);margin-right:8px"></i>Setor ke Target</h3>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="field"><label>Jumlah Setoran (Rp)</label><input id="dm-amount" type="number" placeholder="100000"></div>
+      <div class="field"><label>Catatan</label><input id="dm-note" placeholder="Opsional"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeDepositModal()">Batal</button>
+      <button class="btn btn-teal" onclick="saveDeposit()"><i class="fa fa-plus"></i> Setor</button>
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">💰</div>
+      <div class="logo-text">Dompet<span>kita</span></div>
+    </div>
+
+    <div class="nav-label">Menu Utama</div>
+    <button class="nav-btn active" onclick="showView('dashboard',this)">
+      <i class="fa fa-chart-pie"></i> Dashboard
+    </button>
+    <button class="nav-btn" onclick="showView('pemasukan',this)">
+      <i class="fa fa-arrow-trend-up"></i> Pemasukan
+    </button>
+    <button class="nav-btn" onclick="showView('pengeluaran',this)">
+      <i class="fa fa-arrow-trend-down"></i> Pengeluaran
+    </button>
+    <button class="nav-btn" onclick="showView('tabungan',this)">
+      <i class="fa fa-piggy-bank"></i> Tabungan
+    </button>
+    <button class="nav-btn" onclick="showView('riwayat',this)">
+      <i class="fa fa-clock-rotate-left"></i> Riwayat
+    </button>
+
+    <div class="sidebar-footer">
+      <p>Saldo Hari Ini<br><strong id="sb-balance">Rp 0</strong></p>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+    <div class="topbar">
+      <div class="page-title" id="page-title">Dashboard <span>Keuangan</span></div>
+      <div class="date-badge" id="date-badge"></div>
+    </div>
+
+    <!-- ══ DASHBOARD ══ -->
+    <div class="view active" id="view-dashboard">
+      <div class="summary-grid">
+        <div class="card teal">
+          <i class="fa fa-wallet card-icon"></i>
+          <div class="card-label">Total Saldo</div>
+          <div class="card-amount" id="ds-balance">Rp 0</div>
+          <div class="card-sub">Pemasukan - Pengeluaran</div>
+        </div>
+        <div class="card gold">
+          <i class="fa fa-arrow-up card-icon"></i>
+          <div class="card-label">Total Pemasukan</div>
+          <div class="card-amount" id="ds-income">Rp 0</div>
+          <div class="card-sub" id="ds-income-sub">Bulan ini</div>
+        </div>
+        <div class="card rose">
+          <i class="fa fa-arrow-down card-icon"></i>
+          <div class="card-label">Total Pengeluaran</div>
+          <div class="card-amount" id="ds-expense">Rp 0</div>
+          <div class="card-sub" id="ds-expense-sub">Bulan ini</div>
+        </div>
+      </div>
+
+      <div class="chart-row">
+        <div class="chart-card">
+          <h3><i class="fa fa-chart-bar" style="color:var(--teal);margin-right:6px"></i>7 Hari Terakhir</h3>
+          <canvas id="bar-chart" height="180"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3><i class="fa fa-chart-pie" style="color:var(--gold);margin-right:6px"></i>Komposisi Pengeluaran</h3>
+          <canvas id="pie-chart" height="180"></canvas>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>Transaksi Terkini</h3>
+          <button class="btn btn-ghost btn-sm" onclick="showView('riwayat',null)">Lihat Semua <i class="fa fa-arrow-right"></i></button>
+        </div>
+        <table>
+          <thead><tr>
+            <th>Tanggal</th><th>Deskripsi</th><th>Kategori</th><th>Tipe</th><th>Jumlah</th>
+          </tr></thead>
+          <tbody id="recent-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ PEMASUKAN ══ -->
+    <div class="view" id="view-pemasukan">
+      <div class="form-card">
+        <h3><i class="fa fa-plus-circle"></i> Catat Pemasukan</h3>
+        <div class="form-row">
+          <div class="field"><label>Deskripsi</label><input id="inc-desc" placeholder="cth: Gaji Bulanan"></div>
+          <div class="field"><label>Jumlah (Rp)</label><input id="inc-amount" type="number" placeholder="0"></div>
+          <div class="field"><label>Kategori</label>
+            <select id="inc-cat">
+              <option>Gaji</option><option>Bonus</option><option>Freelance</option>
+              <option>Investasi</option><option>Hadiah</option><option>Lainnya</option>
+            </select>
+          </div>
+          <div class="field"><label>Tanggal</label><input id="inc-date" type="date"></div>
+        </div>
+        <div class="flex-end"><button class="btn btn-gold" onclick="addTransaction('income')"><i class="fa fa-plus"></i> Tambah</button></div>
+      </div>
+
+      <div class="summary-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="card gold"><i class="fa fa-coins card-icon"></i>
+          <div class="card-label">Total Pemasukan</div>
+          <div class="card-amount" id="inc-total">Rp 0</div>
+          <div class="card-sub">Semua waktu</div>
+        </div>
+        <div class="card teal"><i class="fa fa-calendar card-icon"></i>
+          <div class="card-label">Bulan Ini</div>
+          <div class="card-amount" id="inc-month">Rp 0</div>
+          <div class="card-sub" id="inc-month-lbl"></div>
+        </div>
+        <div class="card blue"><i class="fa fa-star card-icon"></i>
+          <div class="card-label">Rata-rata/Bulan</div>
+          <div class="card-amount" id="inc-avg">Rp 0</div>
+          <div class="card-sub">Per bulan</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-header"><h3>Daftar Pemasukan</h3>
+          <div class="filter-row">
+            <input type="month" id="inc-filter-month" onchange="renderIncomeTable()">
+          </div>
+        </div>
+        <table><thead><tr><th>Tanggal</th><th>Deskripsi</th><th>Kategori</th><th>Jumlah</th><th>Aksi</th></tr></thead>
+        <tbody id="income-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- ══ PENGELUARAN ══ -->
+    <div class="view" id="view-pengeluaran">
+      <div class="form-card">
+        <h3><i class="fa fa-minus-circle" style="color:var(--rose)"></i> Catat Pengeluaran</h3>
+        <div class="form-row">
+          <div class="field"><label>Deskripsi</label><input id="exp-desc" placeholder="cth: Makan Siang"></div>
+          <div class="field"><label>Jumlah (Rp)</label><input id="exp-amount" type="number" placeholder="0"></div>
+          <div class="field"><label>Kategori</label>
+            <select id="exp-cat">
+              <option>Makanan</option><option>Transport</option><option>Belanja</option>
+              <option>Tagihan</option><option>Kesehatan</option><option>Hiburan</option>
+              <option>Pendidikan</option><option>Lainnya</option>
+            </select>
+          </div>
+          <div class="field"><label>Tanggal</label><input id="exp-date" type="date"></div>
+        </div>
+        <div class="flex-end"><button class="btn btn-rose" onclick="addTransaction('expense')"><i class="fa fa-plus"></i> Tambah</button></div>
+      </div>
+
+      <div class="summary-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="card rose"><i class="fa fa-fire card-icon"></i>
+          <div class="card-label">Total Pengeluaran</div>
+          <div class="card-amount" id="exp-total">Rp 0</div>
+          <div class="card-sub">Semua waktu</div>
+        </div>
+        <div class="card gold"><i class="fa fa-calendar card-icon"></i>
+          <div class="card-label">Bulan Ini</div>
+          <div class="card-amount" id="exp-month">Rp 0</div>
+          <div class="card-sub" id="exp-month-lbl"></div>
+        </div>
+        <div class="card blue"><i class="fa fa-chart-line card-icon"></i>
+          <div class="card-label">Terbesar Bulan Ini</div>
+          <div class="card-amount" id="exp-biggest">Rp 0</div>
+          <div class="card-sub" id="exp-biggest-lbl">-</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-header"><h3>Daftar Pengeluaran</h3>
+          <div class="filter-row">
+            <input type="month" id="exp-filter-month" onchange="renderExpenseTable()">
+          </div>
+        </div>
+        <table><thead><tr><th>Tanggal</th><th>Deskripsi</th><th>Kategori</th><th>Jumlah</th><th>Aksi</th></tr></thead>
+        <tbody id="expense-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- ══ TABUNGAN ══ -->
+    <div class="view" id="view-tabungan">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <h2 style="font-size:18px">🎯 Target Tabungan</h2>
+        <button class="btn btn-blue" onclick="openGoalModal()"><i class="fa fa-plus"></i> Buat Target</button>
+      </div>
+
+      <div class="summary-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:20px">
+        <div class="card blue"><i class="fa fa-bullseye card-icon"></i>
+          <div class="card-label">Total Target</div>
+          <div class="card-amount" id="sav-total-target">Rp 0</div>
+          <div class="card-sub">Semua target</div>
+        </div>
+        <div class="card teal"><i class="fa fa-piggy-bank card-icon"></i>
+          <div class="card-label">Total Terkumpul</div>
+          <div class="card-amount" id="sav-total-saved">Rp 0</div>
+          <div class="card-sub">Dana tersimpan</div>
+        </div>
+        <div class="card gold"><i class="fa fa-trophy card-icon"></i>
+          <div class="card-label">Target Tercapai</div>
+          <div class="card-amount" id="sav-done">0</div>
+          <div class="card-sub">Dari semua target</div>
+        </div>
+      </div>
+
+      <div class="goals-grid" id="goals-grid">
+        <div class="empty-state" style="grid-column:1/-1">
+          <i class="fa fa-piggy-bank"></i>
+          <p>Belum ada target tabungan. Buat target pertamamu!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ RIWAYAT ══ -->
+    <div class="view" id="view-riwayat">
+      <div class="month-bar">
+        <input type="month" id="hist-filter-month" onchange="renderHistoryTable()">
+        <select id="hist-filter-type" onchange="renderHistoryTable()">
+          <option value="">Semua Tipe</option>
+          <option value="income">Pemasukan</option>
+          <option value="expense">Pengeluaran</option>
+          <option value="saving">Tabungan</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="exportCSV()"><i class="fa fa-download"></i> Export CSV</button>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-box"><div class="val" id="hist-income" style="color:var(--teal)">Rp 0</div><div class="lbl">Pemasukan</div></div>
+        <div class="stat-box"><div class="val" id="hist-expense" style="color:var(--rose)">Rp 0</div><div class="lbl">Pengeluaran</div></div>
+        <div class="stat-box"><div class="val" id="hist-saving" style="color:var(--blue)">Rp 0</div><div class="lbl">Tabungan</div></div>
+        <div class="stat-box"><div class="val" id="hist-net">Rp 0</div><div class="lbl">Saldo Bersih</div></div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-header"><h3>Riwayat Lengkap</h3></div>
+        <table><thead><tr><th>Tanggal</th><th>Deskripsi</th><th>Kategori</th><th>Tipe</th><th>Jumlah</th><th>Aksi</th></tr></thead>
+        <tbody id="history-tbody"></tbody></table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+// ════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════
+let transactions = JSON.parse(localStorage.getItem('dp_transactions') || '[]');
+let goals        = JSON.parse(localStorage.getItem('dp_goals')        || '[]');
+let activeDepositGoalId = null;
+let barChart = null, pieChart = null;
+
+// ════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════
+const fmt = n => 'Rp ' + Math.abs(n).toLocaleString('id-ID');
+const today = () => new Date().toISOString().split('T')[0];
+const uid   = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+
+function nowLabel() {
+  return new Date().toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+function monthKey(dateStr) {
+  return dateStr ? dateStr.slice(0,7) : '';
+}
+function thisMonth() {
+  return today().slice(0,7);
+}
+
+function save() {
+  localStorage.setItem('dp_transactions', JSON.stringify(transactions));
+  localStorage.setItem('dp_goals', JSON.stringify(goals));
+}
+
+function toast(msg, type='success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<i class="fa fa-${type==='success'?'circle-check':'circle-xmark'}"></i> ${msg}`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════
+function showView(id, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const titles = {dashboard:'Dashboard <span>Keuangan</span>',pemasukan:'Catat <span>Pemasukan</span>',pengeluaran:'Catat <span>Pengeluaran</span>',tabungan:'Target <span>Tabungan</span>',riwayat:'Riwayat <span>Transaksi</span>'};
+  document.getElementById('page-title').innerHTML = titles[id] || id;
+  refreshAll();
+}
+
+// ════════════════════════════════════════
+//  TRANSACTIONS
+// ════════════════════════════════════════
+function addTransaction(type) {
+  const isInc = type === 'income';
+  const desc   = document.getElementById(isInc?'inc-desc':'exp-desc').value.trim();
+  const amount = parseFloat(document.getElementById(isInc?'inc-amount':'exp-amount').value);
+  const cat    = document.getElementById(isInc?'inc-cat':'exp-cat').value;
+  const date   = document.getElementById(isInc?'inc-date':'exp-date').value || today();
+  if (!desc) { toast('Isi deskripsi terlebih dahulu','error'); return; }
+  if (!amount || amount <= 0) { toast('Jumlah harus lebih dari 0','error'); return; }
+  transactions.unshift({ id:uid(), type, desc, amount, cat, date });
+  save(); refreshAll();
+  document.getElementById(isInc?'inc-desc':'exp-desc').value = '';
+  document.getElementById(isInc?'inc-amount':'exp-amount').value = '';
+  toast(`${isInc?'Pemasukan':'Pengeluaran'} ${fmt(amount)} berhasil dicatat ✓`);
+}
+
+function deleteTransaction(id) {
+  transactions = transactions.filter(t => t.id !== id);
+  save(); refreshAll();
+  toast('Transaksi dihapus','error');
+}
+
+// ════════════════════════════════════════
+//  GOALS
+// ════════════════════════════════════════
+function openGoalModal()  { document.getElementById('goal-modal').classList.add('open'); }
+function closeGoalModal() { document.getElementById('goal-modal').classList.remove('open'); }
+function openDepositModal(id) {
+  activeDepositGoalId = id;
+  const g = goals.find(x => x.id===id);
+  document.getElementById('deposit-title').innerHTML = `<i class="fa fa-piggy-bank" style="color:var(--teal);margin-right:8px"></i>Setor ke: ${g.icon} ${g.name}`;
+  document.getElementById('dm-amount').value = '';
+  document.getElementById('dm-note').value = '';
+  document.getElementById('deposit-modal').classList.add('open');
+}
+function closeDepositModal() { document.getElementById('deposit-modal').classList.remove('open'); }
+
+function saveGoal() {
+  const name     = document.getElementById('gm-name').value.trim();
+  const target   = parseFloat(document.getElementById('gm-target').value);
+  const init     = parseFloat(document.getElementById('gm-init').value) || 0;
+  const deadline = document.getElementById('gm-deadline').value;
+  const icon     = document.getElementById('gm-icon').value;
+  if (!name || !target || target<=0) { toast('Isi nama dan target dana','error'); return; }
+  goals.push({ id:uid(), name, target, saved:init, deadline, icon, deposits:[] });
+  save(); closeGoalModal(); refreshAll();
+  document.getElementById('gm-name').value=''; document.getElementById('gm-target').value='';
+  document.getElementById('gm-init').value='0'; document.getElementById('gm-deadline').value='';
+  toast(`Target "${name}" berhasil dibuat 🎯`);
+}
+
+function saveDeposit() {
+  const amount = parseFloat(document.getElementById('dm-amount').value);
+  const note   = document.getElementById('dm-note').value.trim();
+  if (!amount || amount<=0) { toast('Masukkan jumlah setoran','error'); return; }
+  const g = goals.find(x => x.id===activeDepositGoalId);
+  if (!g) return;
+  g.saved += amount;
+  g.deposits.push({ date:today(), amount, note });
+  // also record as saving transaction
+  transactions.unshift({ id:uid(), type:'saving', desc:`Setoran: ${g.icon} ${g.name}`, amount, cat:'Tabungan', date:today(), goalId:g.id });
+  save(); closeDepositModal(); refreshAll();
+  toast(`${fmt(amount)} berhasil disetor ke "${g.name}" 🐷`);
+}
+
+function deleteGoal(id) {
+  if (!confirm('Hapus target ini?')) return;
+  goals = goals.filter(g => g.id!==id);
+  save(); refreshAll();
+  toast('Target dihapus','error');
+}
+
+// ════════════════════════════════════════
+//  RENDER
+// ════════════════════════════════════════
+function refreshAll() {
+  updateSummaryCards();
+  renderRecentTable();
+  renderIncomeTable();
+  renderExpenseTable();
+  renderGoals();
+  renderHistoryTable();
+  renderCharts();
+  updateSidebar();
+}
+
+function updateSummaryCards() {
+  const m = thisMonth();
+  const incAll  = transactions.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const expAll  = transactions.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const savAll  = transactions.filter(t=>t.type==='saving').reduce((s,t)=>s+t.amount,0);
+  const incM    = transactions.filter(t=>t.type==='income'&&t.date.startsWith(m)).reduce((s,t)=>s+t.amount,0);
+  const expM    = transactions.filter(t=>t.type==='expense'&&t.date.startsWith(m)).reduce((s,t)=>s+t.amount,0);
+  const balance = incAll - expAll - savAll;
+
+  document.getElementById('ds-balance').textContent  = fmt(balance);
+  document.getElementById('ds-income').textContent   = fmt(incM);
+  document.getElementById('ds-expense').textContent  = fmt(expM);
+
+  document.getElementById('inc-total').textContent = fmt(incAll);
+  document.getElementById('inc-month').textContent = fmt(incM);
+  document.getElementById('inc-month-lbl').textContent = formatMonthLabel(m);
+
+  document.getElementById('exp-total').textContent = fmt(expAll);
+  document.getElementById('exp-month').textContent = fmt(expM);
+  document.getElementById('exp-month-lbl').textContent = formatMonthLabel(m);
+
+  // avg income per month
+  const months = [...new Set(transactions.filter(t=>t.type==='income').map(t=>t.date.slice(0,7)))];
+  document.getElementById('inc-avg').textContent = months.length ? fmt(incAll/months.length) : 'Rp 0';
+
+  // biggest expense this month
+  const expItems = transactions.filter(t=>t.type==='expense'&&t.date.startsWith(m));
+  const biggest = expItems.reduce((mx,t)=>t.amount>mx.amount?t:mx, {amount:0,desc:'-'});
+  document.getElementById('exp-biggest').textContent = fmt(biggest.amount);
+  document.getElementById('exp-biggest-lbl').textContent = biggest.desc;
+
+  // saving summary
+  const totalTarget = goals.reduce((s,g)=>s+g.target,0);
+  const totalSaved  = goals.reduce((s,g)=>s+g.saved,0);
+  const done        = goals.filter(g=>g.saved>=g.target).length;
+  document.getElementById('sav-total-target').textContent = fmt(totalTarget);
+  document.getElementById('sav-total-saved').textContent  = fmt(totalSaved);
+  document.getElementById('sav-done').textContent         = done;
+}
+
+function formatMonthLabel(m) {
+  if (!m) return '';
+  const [y,mo] = m.split('-');
+  const names = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  return names[parseInt(mo)-1] + ' ' + y;
+}
+
+function rowDate(d) {
+  if (!d) return '-';
+  const [y,m,day] = d.split('-');
+  const names = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  return `${day} ${names[parseInt(m)-1]} ${y}`;
+}
+
+function renderRecentTable() {
+  const tbody = document.getElementById('recent-tbody');
+  const items = transactions.slice(0,8);
+  if (!items.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="fa fa-receipt"></i><p>Belum ada transaksi</p></div></td></tr>`; return; }
+  tbody.innerHTML = items.map(t => `
+    <tr>
+      <td class="text-mid">${rowDate(t.date)}</td>
+      <td>${t.desc}</td>
+      <td><span class="badge badge-${t.type==='income'?'income':t.type==='saving'?'saving':'expense'}">${t.cat}</span></td>
+      <td><span class="badge badge-${t.type==='income'?'income':t.type==='saving'?'saving':'expense'}">${t.type==='income'?'Pemasukan':t.type==='saving'?'Tabungan':'Pengeluaran'}</span></td>
+      <td class="amount-${t.type==='income'?'income':t.type==='saving'?'saving':'expense'}">${t.type!=='income'?'-':'+'} ${fmt(t.amount)}</td>
+    </tr>`).join('');
+}
+
+function renderIncomeTable() {
+  const fm = document.getElementById('inc-filter-month').value;
+  const items = transactions.filter(t=>t.type==='income'&&(!fm||t.date.startsWith(fm)));
+  const tbody = document.getElementById('income-tbody');
+  if (!items.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="fa fa-arrow-trend-up"></i><p>Belum ada pemasukan</p></div></td></tr>`; return; }
+  tbody.innerHTML = items.map(t => `
+    <tr>
+      <td class="text-mid">${rowDate(t.date)}</td>
+      <td>${t.desc}</td>
+      <td><span class="badge badge-income">${t.cat}</span></td>
+      <td class="amount-income">+ ${fmt(t.amount)}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteTransaction('${t.id}')"><i class="fa fa-trash"></i></button></td>
+    </tr>`).join('');
+}
+
+function renderExpenseTable() {
+  const fm = document.getElementById('exp-filter-month').value;
+  const items = transactions.filter(t=>t.type==='expense'&&(!fm||t.date.startsWith(fm)));
+  const tbody = document.getElementById('expense-tbody');
+  if (!items.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="fa fa-arrow-trend-down"></i><p>Belum ada pengeluaran</p></div></td></tr>`; return; }
+  tbody.innerHTML = items.map(t => `
+    <tr>
+      <td class="text-mid">${rowDate(t.date)}</td>
+      <td>${t.desc}</td>
+      <td><span class="badge badge-expense">${t.cat}</span></td>
+      <td class="amount-expense">- ${fmt(t.amount)}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteTransaction('${t.id}')"><i class="fa fa-trash"></i></button></td>
+    </tr>`).join('');
+}
+
+function renderHistoryTable() {
+  const fm   = document.getElementById('hist-filter-month').value;
+  const ft   = document.getElementById('hist-filter-type').value;
+  let items  = transactions.filter(t=>(!fm||t.date.startsWith(fm))&&(!ft||t.type===ft));
+  const tbody = document.getElementById('history-tbody');
+
+  const inc = items.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const exp = items.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const sav = items.filter(t=>t.type==='saving').reduce((s,t)=>s+t.amount,0);
+  document.getElementById('hist-income').textContent  = fmt(inc);
+  document.getElementById('hist-expense').textContent = fmt(exp);
+  document.getElementById('hist-saving').textContent  = fmt(sav);
+  const net = inc - exp - sav;
+  const netEl = document.getElementById('hist-net');
+  netEl.textContent = (net<0?'-':'+') + ' ' + fmt(net);
+  netEl.style.color = net < 0 ? 'var(--rose)' : 'var(--teal)';
+
+  if (!items.length) { tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="fa fa-clock-rotate-left"></i><p>Tidak ada riwayat</p></div></td></tr>`; return; }
+  tbody.innerHTML = items.map(t => `
+    <tr>
+      <td class="text-mid">${rowDate(t.date)}</td>
+      <td>${t.desc}</td>
+      <td><span class="badge badge-${t.type==='income'?'income':t.type==='saving'?'saving':'expense'}">${t.cat}</span></td>
+      <td><span class="badge badge-${t.type==='income'?'income':t.type==='saving'?'saving':'expense'}">${t.type==='income'?'Pemasukan':t.type==='saving'?'Tabungan':'Pengeluaran'}</span></td>
+      <td class="amount-${t.type==='income'?'income':t.type==='saving'?'saving':'expense'}">${t.type==='income'?'+':'-'} ${fmt(t.amount)}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteTransaction('${t.id}')"><i class="fa fa-trash"></i></button></td>
+    </tr>`).join('');
+}
+
+function renderGoals() {
+  const grid = document.getElementById('goals-grid');
+  if (!goals.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><i class="fa fa-piggy-bank"></i><p>Belum ada target tabungan. Buat target pertamamu!</p></div>`;
+    return;
+  }
+  grid.innerHTML = goals.map(g => {
+    const pct = Math.min(100, Math.round((g.saved/g.target)*100));
+    const done = g.saved >= g.target;
+    const left = Math.max(0, g.target - g.saved);
+    return `
+    <div class="goal-card">
+      <div class="goal-header">
+        <div>
+          <div class="goal-name">${g.icon} ${g.name}</div>
+          <div class="goal-deadline">📅 ${g.deadline ? rowDate(g.deadline) : 'Tanpa batas waktu'}</div>
+        </div>
+        <div class="goal-actions">
+          ${!done?`<button class="btn btn-teal btn-sm" onclick="openDepositModal('${g.id}')"><i class="fa fa-plus"></i> Setor</button>`:''}
+          <button class="btn btn-danger btn-sm" onclick="deleteGoal('${g.id}')"><i class="fa fa-trash"></i></button>
+        </div>
+      </div>
+      <div class="goal-amounts">
+        <div class="goal-saved">${fmt(g.saved)}</div>
+        <div class="goal-target">dari ${fmt(g.target)}</div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="goal-pct"><span>Terkumpul <span class="pct-val">${pct}%</span></span><span style="color:var(--rose)">Kurang ${fmt(left)}</span></div>
+      ${done?`<div class="goal-complete"><i class="fa fa-circle-check"></i><p>Target Tercapai! 🎉</p></div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════
+//  CHARTS
+// ════════════════════════════════════════
+function getLast7Days() {
+  const days = [];
+  for (let i=6;i>=0;i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    days.push(d.toISOString().split('T')[0]);
+  }
+  return days;
+}
+
+function renderCharts() {
+  const days = getLast7Days();
+  const incData = days.map(d=>transactions.filter(t=>t.type==='income'&&t.date===d).reduce((s,t)=>s+t.amount,0));
+  const expData = days.map(d=>transactions.filter(t=>t.type==='expense'&&t.date===d).reduce((s,t)=>s+t.amount,0));
+  const labels  = days.map(d=>{ const [,m,day]=d.split('-'); return `${day}/${m}`; });
+
+  if (barChart) barChart.destroy();
+  const barCtx = document.getElementById('bar-chart').getContext('2d');
+  barChart = new Chart(barCtx, {
+    type:'bar',
+    data:{ labels, datasets:[
+      { label:'Pemasukan', data:incData, backgroundColor:'rgba(0,212,170,0.7)', borderRadius:6, borderSkipped:false },
+      { label:'Pengeluaran', data:expData, backgroundColor:'rgba(255,107,138,0.7)', borderRadius:6, borderSkipped:false }
+    ]},
+    options:{ responsive:true, plugins:{ legend:{ labels:{ color:'#9CA8C4', font:{family:'Space Grotesk'} } } }, scales:{
+      x:{ ticks:{color:'#9CA8C4'}, grid:{color:'rgba(255,255,255,0.04)'} },
+      y:{ ticks:{color:'#9CA8C4', callback:v=>'Rp '+v.toLocaleString('id-ID')}, grid:{color:'rgba(255,255,255,0.04)'} }
+    }}
+  });
+
+  // PIE: expense categories this month
+  const m = thisMonth();
+  const cats = {};
+  transactions.filter(t=>t.type==='expense'&&t.date.startsWith(m)).forEach(t=>{ cats[t.cat]=(cats[t.cat]||0)+t.amount; });
+  const pieLabels = Object.keys(cats);
+  const pieData   = Object.values(cats);
+  const palette   = ['#00D4AA','#FFB347','#FF6B8A','#4F9EFF','#c084fc','#fb923c','#34d399','#f43f5e'];
+
+  if (pieChart) pieChart.destroy();
+  const pieCtx = document.getElementById('pie-chart').getContext('2d');
+  if (!pieLabels.length) {
+    pieCtx.fillStyle = '#4B5568'; pieCtx.font = '14px Space Grotesk';
+    pieCtx.textAlign = 'center'; pieCtx.fillText('Belum ada data bulan ini', pieCtx.canvas.width/2, pieCtx.canvas.height/2);
+    return;
+  }
+  pieChart = new Chart(pieCtx, {
+    type:'doughnut',
+    data:{ labels:pieLabels, datasets:[{ data:pieData, backgroundColor:palette.slice(0,pieLabels.length), borderWidth:2, borderColor:'#111827' }] },
+    options:{ responsive:true, cutout:'60%', plugins:{
+      legend:{ position:'bottom', labels:{ color:'#9CA8C4', font:{family:'Space Grotesk'}, padding:12 } }
+    }}
+  });
+}
+
+// ════════════════════════════════════════
+//  SIDEBAR BALANCE
+// ════════════════════════════════════════
+function updateSidebar() {
+  const inc = transactions.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const exp = transactions.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const sav = transactions.filter(t=>t.type==='saving').reduce((s,t)=>s+t.amount,0);
+  document.getElementById('sb-balance').textContent = fmt(inc-exp-sav);
+}
+
+// ════════════════════════════════════════
+//  EXPORT CSV
+// ════════════════════════════════════════
+function exportCSV() {
+  const fm = document.getElementById('hist-filter-month').value;
+  const ft = document.getElementById('hist-filter-type').value;
+  let items = transactions.filter(t=>(!fm||t.date.startsWith(fm))&&(!ft||t.type===ft));
+  const rows = [['Tanggal','Deskripsi','Kategori','Tipe','Jumlah']];
+  items.forEach(t=>rows.push([t.date,t.desc,t.cat,t.type,t.amount]));
+  const csv = rows.map(r=>r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `keuangan_${fm||'all'}.csv`; a.click();
+  toast('CSV berhasil diunduh 📥');
+}
+
+// ════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════
+document.getElementById('date-badge').textContent = nowLabel();
+
+// Set default dates
+const todayStr = today();
+['inc-date','exp-date'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=todayStr; });
+const thisM = thisMonth();
+['inc-filter-month','exp-filter-month','hist-filter-month'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=thisM; });
+
+// Close modals on overlay click
+document.getElementById('goal-modal').addEventListener('click', function(e){ if(e.target===this) closeGoalModal(); });
+document.getElementById('deposit-modal').addEventListener('click', function(e){ if(e.target===this) closeDepositModal(); });
+
+refreshAll();
+</script>
+</body>
+</html>
